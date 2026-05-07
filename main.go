@@ -4,21 +4,48 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync/atomic"
 )
 
-type AppHandler struct {
-	fileServer http.Handler
+type apiConfig struct {
+	fileserverHits atomic.Int32
 }
 
-func (ah *AppHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		api.fileserverHits.Add(1)
+		next.ServeHTTP(w, req)
+	})
+}
 
-	ah.fileServer.ServeHTTP(response, request)
+func (api *apiConfig) metricsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(200)
+		text := fmt.Sprintf("Hits: %d", api.fileserverHits.Load())
+		w.Write([]byte(text))
+	})
+}
+
+func (api *apiConfig) resetHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		api.fileserverHits.Store(0)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	})
 }
 
 func main() {
+	apiConfig := apiConfig{}
+
 	mux := http.NewServeMux()
-	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+
+	fileHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
+	mux.Handle("/app/", apiConfig.middlewareMetricsInc(fileHandler))
 	mux.HandleFunc("/healthz", handleHelthz)
+	mux.Handle("/metrics", apiConfig.metricsHandler())
+	mux.Handle("/reset", apiConfig.resetHandler())
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -32,8 +59,8 @@ func main() {
 	}
 }
 
-func handleHelthz(response http.ResponseWriter, req *http.Request) {
-	response.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	response.WriteHeader(200)
-	response.Write([]byte("OK"))
+func handleHelthz(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(200)
+	w.Write([]byte("OK"))
 }
