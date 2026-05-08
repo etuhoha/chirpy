@@ -1,14 +1,20 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
 	"sync/atomic"
+
+	"github.com/etuhoha/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
 }
 
 func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -47,6 +53,20 @@ func (api *apiConfig) resetHandler() http.Handler {
 func main() {
 	apiConfig := apiConfig{}
 
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Printf("can't load the environment: %s\n", err)
+		os.Exit(1)
+	}
+
+	dbUrl := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		fmt.Printf("can't open DB: %s\n", err)
+		os.Exit(1)
+	}
+	apiConfig.db = database.New(db)
+
 	mux := http.NewServeMux()
 
 	fileHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
@@ -66,7 +86,8 @@ func main() {
 		Handler: mux,
 	}
 
-	err := server.ListenAndServe()
+	fmt.Printf("Serving at %s...\n", server.Addr)
+	err = server.ListenAndServe()
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		os.Exit(1)
