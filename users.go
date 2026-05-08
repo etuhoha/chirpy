@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -19,13 +18,13 @@ func handleCreateUser(db *database.Queries, w http.ResponseWriter, req *http.Req
 	decoder := json.NewDecoder(req.Body)
 	err := decoder.Decode(&reqData)
 	if err != nil || reqData.Email == nil {
-		respondJsonError(w, http.StatusBadRequest, "malformed request")
+		respondJsonError(w, http.StatusBadRequest, "malformed request", err)
 		return
 	}
 
 	user, err := db.CreateUser(req.Context(), *reqData.Email)
 	if err != nil {
-		respondJsonError(w, http.StatusBadRequest, fmt.Sprintf("can not create user: %v", err))
+		respondJsonError(w, http.StatusBadRequest, "can not create user", err)
 		return
 	}
 

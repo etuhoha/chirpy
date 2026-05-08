@@ -35,12 +35,12 @@ func handleValidateChirp(w http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(req.Body)
 	err := decoder.Decode(&data)
 	if err != nil || data.Body == nil {
-		respondJsonError(w, http.StatusBadRequest, "malformed request")
+		respondJsonError(w, http.StatusBadRequest, "malformed request", err)
 		return
 	}
 
 	if len(*data.Body) > 140 {
-		respondJsonError(w, http.StatusBadRequest, "Chirp is too long")
+		respondJsonError(w, http.StatusBadRequest, "chirp is too long", nil)
 		return
 	}
 
