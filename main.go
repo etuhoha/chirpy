@@ -94,7 +94,9 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
 	mux.Handle("POST /api/users", apiConfig.withDB(handleCreateUser))
+	mux.Handle("GET /api/chirps", apiConfig.withDB(handleGetChirps))
 	mux.Handle("POST /api/chirps", apiConfig.withDB(handleCreateChirp))
+	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withDB(handleGetChirp))
 
 	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())

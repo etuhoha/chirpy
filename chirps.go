@@ -9,6 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type responseChirp struct {
+	Id        uuid.UUID `json:"id"`
+	CreatedAt string    `json:"created_at"`
+	UpdatedAt string    `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserId    uuid.UUID `json:"user_id"`
+}
+
 func handleCreateChirp(db *database.Queries, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
 		Body   *string    `json:"body"`
@@ -32,15 +40,7 @@ func handleCreateChirp(db *database.Queries, w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	type responseData struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt string    `json:"created_at"`
-		UpdatedAt string    `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserId    uuid.UUID `json:"user_id"`
-	}
-
-	resData := responseData{
+	resData := responseChirp{
 		Id:        chirp.ID,
 		CreatedAt: chirp.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: chirp.UpdatedAt.Format(time.RFC3339),
@@ -49,4 +49,56 @@ func handleCreateChirp(db *database.Queries, w http.ResponseWriter, req *http.Re
 	}
 
 	respondJson(w, http.StatusCreated, resData)
+}
+
+func handleGetChirps(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+	chirps, err := db.GetChirps(req.Context())
+	if err != nil {
+		respondJsonError(w, http.StatusBadRequest, "can't get chirps", err)
+		return
+	}
+
+	result := []responseChirp{}
+	for _, chirp := range chirps {
+		chirpData := responseChirp{
+			Id:        chirp.ID,
+			CreatedAt: chirp.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: chirp.UpdatedAt.Format(time.RFC3339),
+			Body:      chirp.Body,
+			UserId:    chirp.UserID,
+		}
+		result = append(result, responseChirp(chirpData))
+	}
+
+	respondJson(w, http.StatusOK, result)
+}
+
+func handleGetChirp(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+	idStr := req.PathValue("chirpID")
+	if len(idStr) == 0 {
+		respondJsonError(w, http.StatusBadRequest, "no chirp id provided", nil)
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		respondJsonError(w, http.StatusBadRequest, "bad ID", err)
+		return
+	}
+
+	chirp, err := db.GetChirp(req.Context(), id)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "can't get chirp", err)
+		return
+	}
+
+	chirpData := responseChirp{
+		Id:        chirp.ID,
+		CreatedAt: chirp.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: chirp.UpdatedAt.Format(time.RFC3339),
+		Body:      chirp.Body,
+		UserId:    chirp.UserID,
+	}
+
+	respondJson(w, http.StatusOK, chirpData)
 }
