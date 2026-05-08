@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -78,29 +77,4 @@ func handleHelthz(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
-}
-
-func handleValidateChirp(w http.ResponseWriter, req *http.Request) {
-	type reqData struct {
-		Body *string `json:"body"`
-	}
-
-	type respValid struct {
-		Valid bool `json:"valid"`
-	}
-
-	data := reqData{}
-	decoder := json.NewDecoder(req.Body)
-	err := decoder.Decode(&data)
-	if err != nil || data.Body == nil {
-		respondJsonError(w, http.StatusBadRequest, "malformed request")
-		return
-	}
-
-	if len(*data.Body) > 140 {
-		respondJsonError(w, http.StatusBadRequest, "Chirp is too long")
-		return
-	}
-
-	respondJson(w, http.StatusOK, respValid{Valid: true})
 }
