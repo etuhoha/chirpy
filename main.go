@@ -24,6 +24,13 @@ func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
+func (api *apiConfig) withDB(next func(db *database.Queries, w http.ResponseWriter, req *http.Request)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		api.fileserverHits.Add(1)
+		next(api.db, w, req)
+	})
+}
+
 func (api *apiConfig) metricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		template := `
@@ -43,7 +50,17 @@ func (api *apiConfig) metricsHandler() http.Handler {
 
 func (api *apiConfig) resetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if os.Getenv("PLATFORM") != "dev" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		api.fileserverHits.Store(0)
+		err := api.db.DeleteUsers(req.Context())
+		if err != nil {
+			fmt.Printf("can't delete users: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -76,6 +93,7 @@ func main() {
 	// public API
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
+	mux.Handle("POST /api/users", apiConfig.withDB(handleCreateUser))
 
 	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())
