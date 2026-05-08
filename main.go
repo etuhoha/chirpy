@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ func (api *apiConfig) metricsHandler() http.Handler {
 </html>
 		`
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		html := fmt.Sprintf(template, api.fileserverHits.Load())
 		w.Write([]byte(html))
 	})
@@ -39,7 +40,7 @@ func (api *apiConfig) resetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		api.fileserverHits.Store(0)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 }
@@ -50,8 +51,14 @@ func main() {
 	mux := http.NewServeMux()
 
 	fileHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
+	// front
 	mux.Handle("/app/", apiConfig.middlewareMetricsInc(fileHandler))
+
+	// public API
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
+	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
+
+	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())
 	mux.Handle("POST /admin/reset", apiConfig.resetHandler())
 
@@ -69,6 +76,31 @@ func main() {
 
 func handleHelthz(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+func handleValidateChirp(w http.ResponseWriter, req *http.Request) {
+	type reqData struct {
+		Body *string `json:"body"`
+	}
+
+	type respValid struct {
+		Valid bool `json:"valid"`
+	}
+
+	data := reqData{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&data)
+	if err != nil || data.Body == nil {
+		respondJsonError(w, http.StatusBadRequest, "malformed request")
+		return
+	}
+
+	if len(*data.Body) > 140 {
+		respondJsonError(w, http.StatusBadRequest, "Chirp is too long")
+		return
+	}
+
+	respondJson(w, http.StatusOK, respValid{Valid: true})
 }
