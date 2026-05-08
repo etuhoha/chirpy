@@ -23,11 +23,15 @@ func respondJson(w http.ResponseWriter, code int, payload any) {
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Printf("error marshalling: %s\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		respondInternalError(w, err)
 		return
 	}
 
 	w.WriteHeader(code)
 	w.Write(data)
+}
+
+func respondInternalError(w http.ResponseWriter, err error) {
+	fmt.Printf("INTERNAL ERROR: %v", err)
+	w.WriteHeader(http.StatusInternalServerError)
 }

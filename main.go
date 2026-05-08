@@ -57,8 +57,7 @@ func (api *apiConfig) resetHandler() http.Handler {
 		api.fileserverHits.Store(0)
 		err := api.db.DeleteUsers(req.Context())
 		if err != nil {
-			fmt.Printf("can't delete users: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			respondInternalError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -94,6 +93,7 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
 	mux.Handle("POST /api/users", apiConfig.withDB(handleCreateUser))
+	mux.Handle("POST /api/login", apiConfig.withDB(handleLogin))
 	mux.Handle("GET /api/chirps", apiConfig.withDB(handleGetChirps))
 	mux.Handle("POST /api/chirps", apiConfig.withDB(handleCreateChirp))
 	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withDB(handleGetChirp))
