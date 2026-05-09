@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/etuhoha/chirpy/internal/auth"
 	"github.com/etuhoha/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -17,24 +18,29 @@ type responseChirp struct {
 	UserId    uuid.UUID `json:"user_id"`
 }
 
-func handleCreateChirp(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+func handleCreateChirp(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
-		Body   *string    `json:"body"`
-		UserId *uuid.UUID `json:"user_id"`
+		Body *string `json:"body"`
 	}
 
 	reqData := requestData{}
 	decoder := json.NewDecoder(req.Body)
 	err := decoder.Decode(&reqData)
-	if err != nil || reqData.Body == nil || reqData.UserId == nil {
+	if err != nil || reqData.Body == nil {
 		respondJsonError(w, http.StatusBadRequest, "malformed request", err)
+		return
+	}
+
+	userId, err := auth.AuthorizeByToken(req.Header, config.authSecret)
+	if err != nil {
+		respondJsonError(w, http.StatusUnauthorized, "unauthorized", err)
 		return
 	}
 
 	params := database.CreateChirpParams{}
 	params.Body = *reqData.Body
-	params.UserID = *reqData.UserId
-	chirp, err := db.CreateChirp(req.Context(), params)
+	params.UserID = userId
+	chirp, err := config.db.CreateChirp(req.Context(), params)
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can not create chirp", err)
 		return
@@ -51,8 +57,8 @@ func handleCreateChirp(db *database.Queries, w http.ResponseWriter, req *http.Re
 	respondJson(w, http.StatusCreated, resData)
 }
 
-func handleGetChirps(db *database.Queries, w http.ResponseWriter, req *http.Request) {
-	chirps, err := db.GetChirps(req.Context())
+func handleGetChirps(config *apiConfig, w http.ResponseWriter, req *http.Request) {
+	chirps, err := config.db.GetChirps(req.Context())
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can't get chirps", err)
 		return
@@ -73,7 +79,7 @@ func handleGetChirps(db *database.Queries, w http.ResponseWriter, req *http.Requ
 	respondJson(w, http.StatusOK, result)
 }
 
-func handleGetChirp(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+func handleGetChirp(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	idStr := req.PathValue("chirpID")
 	if len(idStr) == 0 {
 		respondJsonError(w, http.StatusBadRequest, "no chirp id provided", nil)
@@ -86,7 +92,7 @@ func handleGetChirp(db *database.Queries, w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	chirp, err := db.GetChirp(req.Context(), id)
+	chirp, err := config.db.GetChirp(req.Context(), id)
 	if err != nil {
 		respondJsonError(w, http.StatusNotFound, "can't get chirp", err)
 		return

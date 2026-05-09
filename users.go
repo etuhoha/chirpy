@@ -17,7 +17,7 @@ type responseUser struct {
 	Email     string    `json:"email"`
 }
 
-func handleCreateUser(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+func handleCreateUser(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
 		Email    *string `json:"email"`
 		Password *string `json:"password"`
@@ -38,7 +38,7 @@ func handleCreateUser(db *database.Queries, w http.ResponseWriter, req *http.Req
 		respondInternalError(w, err)
 		return
 	}
-	user, err := db.CreateUser(req.Context(), params)
+	user, err := config.db.CreateUser(req.Context(), params)
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can not create user", err)
 		return
@@ -54,10 +54,11 @@ func handleCreateUser(db *database.Queries, w http.ResponseWriter, req *http.Req
 	respondJson(w, http.StatusCreated, resData)
 }
 
-func handleLogin(db *database.Queries, w http.ResponseWriter, req *http.Request) {
+func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
-		Email    *string `json:"email"`
-		Password *string `json:"password"`
+		Email            *string `json:"email"`
+		Password         *string `json:"password"`
+		ExpiresInSeconds *int    `json:"expires_in_seconds"`
 	}
 
 	reqData := requestData{}
@@ -68,7 +69,7 @@ func handleLogin(db *database.Queries, w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	user, err := db.GetUserByEmail(req.Context(), *reqData.Email)
+	user, err := config.db.GetUserByEmail(req.Context(), *reqData.Email)
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can not find user", err)
 		return
@@ -85,11 +86,32 @@ func handleLogin(db *database.Queries, w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	resData := responseUser{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
-		Email:     user.Email,
+	expiresIn := 1 * time.Hour
+	if reqData.ExpiresInSeconds != nil {
+		e := time.Duration(*reqData.ExpiresInSeconds) * time.Second
+		if e < expiresIn {
+			expiresIn = e
+		}
+	}
+
+	token, err := auth.MakeJWT(user.ID, config.authSecret, time.Duration(expiresIn)*time.Second)
+	if err != nil {
+		respondInternalError(w, err)
+	}
+
+	type responseData struct {
+		responseUser
+		Token string `json:"token"`
+	}
+
+	resData := responseData{
+		responseUser: responseUser{
+			Id:        user.ID,
+			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+			Email:     user.Email,
+		},
+		Token: token,
 	}
 
 	respondJson(w, http.StatusOK, resData)

@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
+	authSecret     string
 }
 
 func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -24,10 +25,10 @@ func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
-func (api *apiConfig) withDB(next func(db *database.Queries, w http.ResponseWriter, req *http.Request)) http.Handler {
+func (api *apiConfig) withConfig(next func(config *apiConfig, w http.ResponseWriter, req *http.Request)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		api.fileserverHits.Add(1)
-		next(api.db, w, req)
+		next(api, w, req)
 	})
 }
 
@@ -75,6 +76,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	apiConfig.authSecret = os.Getenv("AUTH_SECRET")
+	if len(apiConfig.authSecret) == 0 {
+		fmt.Printf("can't load authorization secret from env\n")
+		os.Exit(1)
+	}
+
 	dbUrl := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -92,11 +99,11 @@ func main() {
 	// public API
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
-	mux.Handle("POST /api/users", apiConfig.withDB(handleCreateUser))
-	mux.Handle("POST /api/login", apiConfig.withDB(handleLogin))
-	mux.Handle("GET /api/chirps", apiConfig.withDB(handleGetChirps))
-	mux.Handle("POST /api/chirps", apiConfig.withDB(handleCreateChirp))
-	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withDB(handleGetChirp))
+	mux.Handle("POST /api/users", apiConfig.withConfig(handleCreateUser))
+	mux.Handle("POST /api/login", apiConfig.withConfig(handleLogin))
+	mux.Handle("GET /api/chirps", apiConfig.withConfig(handleGetChirps))
+	mux.Handle("POST /api/chirps", apiConfig.withConfig(handleCreateChirp))
+	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withConfig(handleGetChirp))
 
 	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())
