@@ -31,7 +31,7 @@ func handleCreateChirp(config *apiConfig, w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userId, err := auth.AuthorizeByToken(req.Header, config.authSecret)
+	userId, err := auth.AuthenticateByJWT(req.Header, config.authSecret)
 	if err != nil {
 		respondJsonError(w, http.StatusUnauthorized, "unauthorized", err)
 		return

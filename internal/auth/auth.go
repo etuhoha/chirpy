@@ -63,7 +63,7 @@ func GetBearerToken(headers http.Header) (string, error) {
 	return strings.TrimSpace(tokStr), nil
 }
 
-func AuthorizeByToken(headers http.Header, tokenSecret string) (uuid.UUID, error) {
+func AuthenticateByJWT(headers http.Header, tokenSecret string) (uuid.UUID, error) {
 	token, err := GetBearerToken(headers)
 	if err != nil {
 		return uuid.Nil, err
