@@ -33,7 +33,7 @@ func handleCreateChirp(config *apiConfig, w http.ResponseWriter, req *http.Reque
 
 	userId, err := auth.AuthenticateByJWT(req.Header, config.authSecret)
 	if err != nil {
-		respondJsonError(w, http.StatusUnauthorized, "unauthorized", err)
+		respondJsonError(w, http.StatusUnauthorized, "authentication error", err)
 		return
 	}
 
@@ -107,4 +107,43 @@ func handleGetChirp(config *apiConfig, w http.ResponseWriter, req *http.Request)
 	}
 
 	respondJson(w, http.StatusOK, chirpData)
+}
+
+func handleDeleteChirp(config *apiConfig, w http.ResponseWriter, req *http.Request) {
+	userId, err := auth.AuthenticateByJWT(req.Header, config.authSecret)
+	if err != nil {
+		respondJsonError(w, http.StatusUnauthorized, "authentication error", err)
+		return
+	}
+
+	idStr := req.PathValue("chirpID")
+	if len(idStr) == 0 {
+		respondJsonError(w, http.StatusBadRequest, "no chirp id provided", nil)
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		respondJsonError(w, http.StatusBadRequest, "bad ID", err)
+		return
+	}
+
+	chirp, err := config.db.GetChirp(req.Context(), id)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "can't get chirp", err)
+		return
+	}
+
+	if chirp.UserID != userId {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	err = config.db.DeleteChirp(req.Context(), id)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "can't delete chirp", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

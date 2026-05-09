@@ -107,6 +107,7 @@ func main() {
 	mux.Handle("GET /api/chirps", apiConfig.withConfig(handleGetChirps))
 	mux.Handle("POST /api/chirps", apiConfig.withConfig(handleCreateChirp))
 	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withConfig(handleGetChirp))
+	mux.Handle("DELETE /api/chirps/{chirpID}", apiConfig.withConfig(handleDeleteChirp))
 
 	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())
