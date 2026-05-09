@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var accessTokenExpireIn time.Duration = 1 * time.Hour
+
 type responseUser struct {
 	Id        uuid.UUID `json:"id"`
 	CreatedAt string    `json:"created_at"`
@@ -56,9 +58,8 @@ func handleCreateUser(config *apiConfig, w http.ResponseWriter, req *http.Reques
 
 func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
-		Email            *string `json:"email"`
-		Password         *string `json:"password"`
-		ExpiresInSeconds *int    `json:"expires_in_seconds"`
+		Email    *string `json:"email"`
+		Password *string `json:"password"`
 	}
 
 	reqData := requestData{}
@@ -86,22 +87,25 @@ func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	expiresIn := 1 * time.Hour
-	if reqData.ExpiresInSeconds != nil {
-		e := time.Duration(*reqData.ExpiresInSeconds) * time.Second
-		if e < expiresIn {
-			expiresIn = e
-		}
-	}
-
-	token, err := auth.MakeJWT(user.ID, config.authSecret, time.Duration(expiresIn)*time.Second)
+	params := database.CreateRefreshTokenParams{}
+	params.Token = auth.MakeRefreshToken()
+	params.UserID = user.ID
+	refreshToken, err := config.db.CreateRefreshToken(req.Context(), params)
 	if err != nil {
 		respondInternalError(w, err)
+		return
+	}
+
+	token, err := auth.MakeJWT(user.ID, config.authSecret, accessTokenExpireIn)
+	if err != nil {
+		respondInternalError(w, err)
+		return
 	}
 
 	type responseData struct {
 		responseUser
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	resData := responseData{
@@ -111,8 +115,55 @@ func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 			UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 			Email:     user.Email,
 		},
-		Token: token,
+		Token:        token,
+		RefreshToken: refreshToken.Token,
 	}
 
 	respondJson(w, http.StatusOK, resData)
+}
+
+func handleRefresh(config *apiConfig, w http.ResponseWriter, req *http.Request) {
+	refTokenStr, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "no refresh token", err)
+		return
+	}
+
+	refreshToken, err := config.db.GetRefreshToken(req.Context(), refTokenStr)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "unknown refresh token", nil)
+		return
+	}
+
+	if refreshToken.RevokedAt.Valid || refreshToken.ExpiresAt.Before(time.Now()) {
+		respondJsonError(w, http.StatusUnauthorized, "token expired/revoked", nil)
+		return
+	}
+
+	token, err := auth.MakeJWT(refreshToken.UserID, config.authSecret, accessTokenExpireIn)
+	if err != nil {
+		respondInternalError(w, err)
+		return
+	}
+
+	type responseData struct {
+		Token string `json:"token"`
+	}
+
+	respondJson(w, http.StatusOK, responseData{Token: token})
+}
+
+func handleRevoke(config *apiConfig, w http.ResponseWriter, req *http.Request) {
+	refTokenStr, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondJsonError(w, http.StatusNotFound, "no refresh token", err)
+		return
+	}
+
+	err = config.db.RevokeRefreshToken(req.Context(), refTokenStr)
+	if err != nil {
+		respondInternalError(w, err)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -75,4 +78,14 @@ func AuthenticateByJWT(headers http.Header, tokenSecret string) (uuid.UUID, erro
 	}
 
 	return authId, nil
+}
+
+func MakeRefreshToken() string {
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		fmt.Printf("FATAL: can't read rand: %v\n", err)
+		os.Exit(1)
+	}
+	return hex.EncodeToString(bytes)
 }

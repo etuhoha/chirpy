@@ -101,6 +101,8 @@ func main() {
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
 	mux.Handle("POST /api/users", apiConfig.withConfig(handleCreateUser))
 	mux.Handle("POST /api/login", apiConfig.withConfig(handleLogin))
+	mux.Handle("POST /api/refresh", apiConfig.withConfig(handleRefresh))
+	mux.Handle("POST /api/revoke", apiConfig.withConfig(handleRevoke))
 	mux.Handle("GET /api/chirps", apiConfig.withConfig(handleGetChirps))
 	mux.Handle("POST /api/chirps", apiConfig.withConfig(handleCreateChirp))
 	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withConfig(handleGetChirp))
