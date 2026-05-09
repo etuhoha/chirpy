@@ -56,6 +56,50 @@ func handleCreateUser(config *apiConfig, w http.ResponseWriter, req *http.Reques
 	respondJson(w, http.StatusCreated, resData)
 }
 
+func handleUpdateUser(config *apiConfig, w http.ResponseWriter, req *http.Request) {
+	type requestData struct {
+		Email    *string `json:"email"`
+		Password *string `json:"password"`
+	}
+
+	userId, err := auth.AuthenticateByJWT(req.Header, config.authSecret)
+	if err != nil {
+		respondJsonError(w, http.StatusUnauthorized, "authentication error", err)
+		return
+	}
+
+	reqData := requestData{}
+	decoder := json.NewDecoder(req.Body)
+	err = decoder.Decode(&reqData)
+	if err != nil || reqData.Email == nil || reqData.Password == nil {
+		respondJsonError(w, http.StatusBadRequest, "malformed request", err)
+		return
+	}
+
+	params := database.UpdateUserParams{}
+	params.ID = userId
+	params.Email = *reqData.Email
+	params.HashedPassword, err = auth.HashPassword(*reqData.Password)
+	if err != nil {
+		respondInternalError(w, err)
+		return
+	}
+	user, err := config.db.UpdateUser(req.Context(), params)
+	if err != nil {
+		respondJsonError(w, http.StatusBadRequest, "can not update user", err)
+		return
+	}
+
+	resData := responseUser{
+		Id:        user.ID,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+		Email:     user.Email,
+	}
+
+	respondJson(w, http.StatusOK, resData)
+}
+
 func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 	type requestData struct {
 		Email    *string `json:"email"`

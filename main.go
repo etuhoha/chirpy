@@ -100,6 +100,7 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", handleHelthz)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidateChirp)
 	mux.Handle("POST /api/users", apiConfig.withConfig(handleCreateUser))
+	mux.Handle("PUT /api/users", apiConfig.withConfig(handleUpdateUser))
 	mux.Handle("POST /api/login", apiConfig.withConfig(handleLogin))
 	mux.Handle("POST /api/refresh", apiConfig.withConfig(handleRefresh))
 	mux.Handle("POST /api/revoke", apiConfig.withConfig(handleRevoke))
