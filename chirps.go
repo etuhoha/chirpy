@@ -58,7 +58,28 @@ func handleCreateChirp(config *apiConfig, w http.ResponseWriter, req *http.Reque
 }
 
 func handleGetChirps(config *apiConfig, w http.ResponseWriter, req *http.Request) {
-	chirps, err := config.db.GetChirps(req.Context())
+	var authorId *uuid.UUID = nil
+
+	queryValues := req.URL.Query()
+	authorIdStr := queryValues.Get("author_id")
+	if len(authorIdStr) > 0 {
+		aId, err := uuid.Parse(authorIdStr)
+		if err != nil {
+			respondJsonError(w, http.StatusBadRequest, "malformed author ID", err)
+			return
+		}
+
+		authorId = &aId
+	}
+
+	var chirps []database.Chirp
+	var err error
+	if authorId != nil {
+		chirps, err = config.db.GetChirpsByUser(req.Context(), *authorId)
+	} else {
+		chirps, err = config.db.GetChirps(req.Context())
+	}
+
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can't get chirps", err)
 		return
