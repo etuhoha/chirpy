@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/etuhoha/chirpy/internal/auth"
@@ -61,6 +63,9 @@ func handleGetChirps(config *apiConfig, w http.ResponseWriter, req *http.Request
 	var authorId *uuid.UUID = nil
 
 	queryValues := req.URL.Query()
+
+	sortDesc := strings.ToLower(queryValues.Get("sort")) == "desc"
+
 	authorIdStr := queryValues.Get("author_id")
 	if len(authorIdStr) > 0 {
 		aId, err := uuid.Parse(authorIdStr)
@@ -83,6 +88,12 @@ func handleGetChirps(config *apiConfig, w http.ResponseWriter, req *http.Request
 	if err != nil {
 		respondJsonError(w, http.StatusBadRequest, "can't get chirps", err)
 		return
+	}
+
+	if sortDesc {
+		sort.SliceStable(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
 	}
 
 	result := []responseChirp{}
