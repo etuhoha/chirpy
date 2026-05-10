@@ -13,10 +13,11 @@ import (
 var accessTokenExpireIn time.Duration = 1 * time.Hour
 
 type responseUser struct {
-	Id        uuid.UUID `json:"id"`
-	CreatedAt string    `json:"created_at"`
-	UpdatedAt string    `json:"updated_at"`
-	Email     string    `json:"email"`
+	Id          uuid.UUID `json:"id"`
+	CreatedAt   string    `json:"created_at"`
+	UpdatedAt   string    `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 func handleCreateUser(config *apiConfig, w http.ResponseWriter, req *http.Request) {
@@ -47,10 +48,11 @@ func handleCreateUser(config *apiConfig, w http.ResponseWriter, req *http.Reques
 	}
 
 	resData := responseUser{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
-		Email:     user.Email,
+		Id:          user.ID,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   user.UpdatedAt.Format(time.RFC3339),
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 
 	respondJson(w, http.StatusCreated, resData)
@@ -91,10 +93,11 @@ func handleUpdateUser(config *apiConfig, w http.ResponseWriter, req *http.Reques
 	}
 
 	resData := responseUser{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
-		Email:     user.Email,
+		Id:          user.ID,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   user.UpdatedAt.Format(time.RFC3339),
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 
 	respondJson(w, http.StatusOK, resData)
@@ -154,10 +157,11 @@ func handleLogin(config *apiConfig, w http.ResponseWriter, req *http.Request) {
 
 	resData := responseData{
 		responseUser: responseUser{
-			Id:        user.ID,
-			CreatedAt: user.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
-			Email:     user.Email,
+			Id:          user.ID,
+			CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   user.UpdatedAt.Format(time.RFC3339),
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		},
 		Token:        token,
 		RefreshToken: refreshToken.Token,

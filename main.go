@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	authSecret     string
+	polkaKey       string
 }
 
 func (api *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -82,6 +83,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	apiConfig.polkaKey = os.Getenv("POLKA_KEY")
+	if len(apiConfig.polkaKey) == 0 {
+		fmt.Printf("can't load Polka key from env\n")
+		os.Exit(1)
+	}
+
 	dbUrl := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -108,6 +115,7 @@ func main() {
 	mux.Handle("POST /api/chirps", apiConfig.withConfig(handleCreateChirp))
 	mux.Handle("GET /api/chirps/{chirpID}", apiConfig.withConfig(handleGetChirp))
 	mux.Handle("DELETE /api/chirps/{chirpID}", apiConfig.withConfig(handleDeleteChirp))
+	mux.Handle("POST /api/polka/webhooks", apiConfig.withConfig(handlePolkaWebhook))
 
 	// admin API
 	mux.Handle("GET /admin/metrics", apiConfig.metricsHandler())

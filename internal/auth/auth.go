@@ -66,6 +66,21 @@ func GetBearerToken(headers http.Header) (string, error) {
 	return strings.TrimSpace(tokStr), nil
 }
 
+func GetAPIKey(headers http.Header) (string, error) {
+	authStr := headers.Get("Authorization")
+	if len(authStr) == 0 {
+		return "", fmt.Errorf("no Authorization header")
+	}
+
+	tokStr, found := strings.CutPrefix(authStr, "ApiKey ")
+	if !found {
+		return "", fmt.Errorf("no ApiKey prefix")
+	}
+
+	return strings.TrimSpace(tokStr), nil
+
+}
+
 func AuthenticateByJWT(headers http.Header, tokenSecret string) (uuid.UUID, error) {
 	token, err := GetBearerToken(headers)
 	if err != nil {
